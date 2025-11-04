@@ -11,7 +11,7 @@
     return `${y}-${m}-${d}`;
   }
 
-  const STORAGE_KEY = 'dailyTask:v2';
+  const STORAGE_KEY = 'dailyTask:v3';
 
   function loadState() {
     try {
@@ -29,6 +29,7 @@
       if (typeof parsed.seqPending !== 'number') parsed.seqPending = 0;
       if (typeof parsed.seqCompleted !== 'number') parsed.seqCompleted = 0;
       if (!parsed.currentCycleId) parsed.currentCycleId = parsed.cycles[0]?.id ?? null;
+      parsed.cycles.forEach(c => (c.blocks||[]).forEach(b => { if (typeof b.collapsed !== 'boolean') b.collapsed = false; }));
       return parsed;
     } catch (e) {
       console.error('Failed to load state:', e);
@@ -41,7 +42,7 @@
   const state = loadState();
   function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
-  function uid(prefix='id') { return prefix + '_' + Math.random().toString(36).slice(2,8); }
+  function uid(prefix='id_') { return prefix + Math.random().toString(36).slice(2,8); }
 
   // --- Elements ---
   const els = {
@@ -74,6 +75,7 @@
     startCycle: document.getElementById('startCycle'),
     pauseCycle: document.getElementById('pauseCycle'),
     resetCycle: document.getElementById('resetCycle'),
+    skipBlock: document.getElementById('skipBlock'),
     currentLabel: document.getElementById('currentLabel'),
     nextLabel: document.getElementById('nextLabel'),
     clock: document.getElementById('clock'),
@@ -102,14 +104,13 @@
     if (show) {
       els.blackout.classList.remove('hidden');
       els.blackout.setAttribute('aria-hidden', 'false');
-      requestWakeLock(); // keep screen on during blackout
+      requestWakeLock();
       try { els.blackout.focus(); } catch(_) {}
     } else {
       els.blackout.classList.add('hidden');
       els.blackout.setAttribute('aria-hidden', 'true');
     }
   }
-
   els.blackout.addEventListener('click', () => toggleBlackout(false));
   els.blackoutToggle.addEventListener('click', () => toggleBlackout(els.blackout.classList.contains('hidden')));
   document.addEventListener('visibilitychange', () => {
@@ -118,31 +119,31 @@
     }
   });
 
-  // --- Audio (Web Audio beep) ---
+  // --- Audio (louder beeps) ---
   let audioCtx = null;
   function ensureAudioContext() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
   }
-  function beep(freq = 880, duration = 0.18) {
+  function beep(freq = 880, duration = 0.22) {
     if (!audioCtx) return;
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = 'sine';
-    o.frequency.value = freq;
-    o.connect(g); g.connect(audioCtx.destination);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    osc.connect(gain); gain.connect(audioCtx.destination);
     const now = audioCtx.currentTime;
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.2, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    o.start(now);
-    o.stop(now + duration + 0.02);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.6, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.start(now);
+    osc.stop(now + duration + 0.03);
   }
-  els.audioEnable.addEventListener('click', () => {
+  document.getElementById('audioEnable').addEventListener('click', () => {
     ensureAudioContext();
     beep(1000, 0.12);
-    els.audioEnable.textContent = 'Son activé';
-    els.audioEnable.disabled = true;
+    const b = document.getElementById('audioEnable');
+    b.textContent = 'Son activé'; b.disabled = true;
   });
 
   // --- Tabs ---
@@ -185,10 +186,8 @@
   function addTask(title) {
     title = title.trim();
     if (!title) return;
-    const t = { id: uid('t'), title, done:false, orderPending: ++state.seqPending, orderCompleted: 0 };
-    state.tasks.push(t);
-    saveState();
-    renderTasks();
+    const t = { id: uid('t_'), title, done:false, orderPending: (state.seqPending = state.seqPending + 1), orderCompleted: 0 };
+    state.tasks.push(t); saveState(); renderTasks();
   }
   function toggleDone(id, checked) {
     const t = state.tasks.find(x => x.id === id);
@@ -265,19 +264,19 @@
   // --- Sample cycle
   function sampleCycle() {
     return {
-      id: uid('c'), name: 'Mon cycle',
+      id: uid('c_'), name: 'Mon cycle',
       blocks: [
-        { id: uid('b'), title:'Travail', duration: 29*60, sub: [] },
-        { id: uid('b'), title:'Sport + étirements', duration: 6*60, sub: [
-          { id: uid('s'), title:'Exo 1', duration: 40 },
-          { id: uid('s'), title:'Exo 2', duration: 40 },
-          { id: uid('s'), title:'Exo 3', duration: 40 },
-          { id: uid('s'), title:'Exo 4', duration: 40 },
-          { id: uid('s'), title:'Exo 5', duration: 40 },
-          { id: uid('s'), title:'Exo 6', duration: 40 }
+        { id: uid('b_'), title:'Travail', duration: 29*60, sub: [], collapsed:false },
+        { id: uid('b_'), title:'Sport + étirements', duration: 6*60, collapsed:false, sub: [
+          { id: uid('s_'), title:'Exo 1', duration: 40 },
+          { id: uid('s_'), title:'Exo 2', duration: 40 },
+          { id: uid('s_'), title:'Exo 3', duration: 40 },
+          { id: uid('s_'), title:'Exo 4', duration: 40 },
+          { id: uid('s_'), title:'Exo 5', duration: 40 },
+          { id: uid('s_'), title:'Exo 6', duration: 40 }
         ]},
-        { id: uid('b'), title:'Travail', duration: 29*60, sub: [] },
-        { id: uid('b'), title:'Pause', duration: 9*60, sub: [] }
+        { id: uid('b_'), title:'Travail', duration: 29*60, sub: [], collapsed:false },
+        { id: uid('b_'), title:'Pause', duration: 9*60, sub: [], collapsed:false }
       ]
     };
   }
@@ -286,7 +285,7 @@
   function secondsFromInput(str) {
     const s = String(str||'').trim();
     if (!s) return 0;
-    if (/^\d+$/.test(s)) return parseInt(s,10); // seconds direct
+    if (/^\d+$/.test(s)) return parseInt(s,10);
     const parts = s.split(':').map(p=>parseInt(p,10));
     if (parts.length===2) return parts[0]*60 + (parts[1]||0);
     if (parts.length===3) return parts[0]*3600 + (parts[1]||0)*60 + (parts[2]||0);
@@ -320,6 +319,9 @@
     cycle.blocks.forEach((b, index)=>{
       const li = els.tplBlock.content.firstElementChild.cloneNode(true);
       li.dataset.id=b.id; li.dataset.index=index; li.classList.add('block');
+      if (b.collapsed) li.classList.add('collapsed');
+      const collapseBtn = li.querySelector('.collapse-toggle');
+
       const title = li.querySelector('.block-title');
       const dur = li.querySelector('.block-duration');
       const subList = li.querySelector('.sub-list');
@@ -329,16 +331,27 @@
       title.addEventListener('change', ()=>{ b.title = title.value.trim(); saveState(); });
       dur.addEventListener('change', ()=>{ b.duration = secondsFromInput(dur.value); dur.value = inputFromSeconds(b.duration); saveState(); });
 
-      // Block actions
+      function applyCollapse() {
+        if (b.collapsed) {
+          li.classList.add('collapsed');
+        } else {
+          li.classList.remove('collapsed');
+        }
+      }
+      collapseBtn.addEventListener('click', ()=>{
+        b.collapsed = !b.collapsed; applyCollapse(); saveState();
+      });
+      applyCollapse();
+
       li.querySelector('.add-sub').addEventListener('click', ()=>{
         b.sub = b.sub || [];
-        b.sub.push({ id: uid('s'), title:'Sous-bloc', duration: 30 });
+        b.sub.push({ id: uid('s_'), title:'Sous-bloc', duration: 30 });
         saveState(); renderBlocks();
       });
       li.querySelector('.duplicate').addEventListener('click', ()=>{
         const copy = JSON.parse(JSON.stringify(b));
-        copy.id = uid('b');
-        (copy.sub||[]).forEach(s=> s.id = uid('s'));
+        copy.id = uid('b_');
+        (copy.sub||[]).forEach(s=> s.id = uid('s_'));
         cycle.blocks.splice(index+1, 0, copy);
         saveState(); renderBlocks();
       });
@@ -368,7 +381,6 @@
         }
       });
 
-      // Sub-list render
       (b.sub||[]).forEach((s, sIndex)=>{
         const sub = els.tplSub.content.firstElementChild.cloneNode(true);
         sub.dataset.id = s.id; sub.dataset.index = sIndex; sub.dataset.blockId=b.id;
@@ -379,7 +391,7 @@
         stitle.addEventListener('change', ()=>{ s.title = stitle.value.trim(); saveState(); });
         sdur.addEventListener('change', ()=>{ s.duration = secondsFromInput(sdur.value); sdur.value=inputFromSeconds(s.duration); saveState(); });
         sub.querySelector('.duplicate').addEventListener('click', ()=>{
-          const copy = JSON.parse(JSON.stringify(s)); copy.id = uid('s');
+          const copy = JSON.parse(JSON.stringify(s)); copy.id = uid('s_');
           b.sub.splice(sIndex+1, 0, copy); saveState(); renderBlocks();
         });
         sub.querySelector('.delete').addEventListener('click', ()=>{
@@ -407,7 +419,7 @@
           }
         });
 
-        subList.appendChild(sub);
+        li.querySelector('.sub-list').appendChild(sub);
       });
 
       els.blockList.appendChild(li);
@@ -419,7 +431,7 @@
     if (!state.currentCycleId && state.cycles.length) state.currentCycleId = state.cycles[0].id;
   }
   function createCycle(name='Nouveau cycle') {
-    const c = { id: uid('c'), name, blocks: [] };
+    const c = { id: uid('c_'), name, blocks: [] };
     state.cycles.push(c);
     state.currentCycleId = c.id;
     saveState(); renderCycleSelect(); renderBlocks();
@@ -444,16 +456,15 @@
   });
   els.addBlock.addEventListener('click', ()=>{
     const c = getCurrentCycle(); if (!c) return;
-    c.blocks.push({ id: uid('b'), title:'Nouveau bloc', duration: 60, sub: [] });
+    c.blocks.push({ id: uid('b_'), title:'Nouveau bloc', duration: 60, sub: [], collapsed:false });
     saveState(); renderBlocks();
   });
 
   // --- Runner (timer) ---
   const runner = {
     active:false, paused:false, items:[], index:0,
-    unitStart:0, unitEnd:0, // timestamps (ms since epoch)
-    totalMs:0, elapsedMs:0,
-    timerId:null,
+    unitStart:0, unitEnd:0,
+    totalMs:0, timerId:null,
   };
 
   function buildRunItems() {
@@ -462,10 +473,10 @@
     for (const b of c.blocks) {
       if (b.sub && b.sub.length) {
         for (const s of b.sub) {
-          items.push({ label: `${b.title} — ${s.title}`, ms: (s.duration||0)*1000 });
+          items.push({ label: `${b.title} — ${s.title}`, ms: (s.duration||0)*1000, blockId: b.id });
         }
       } else {
-        items.push({ label: b.title, ms: (b.duration||0)*1000 });
+        items.push({ label: b.title, ms: (b.duration||0)*1000, blockId: b.id });
       }
     }
     return items.filter(it=>it.ms>0);
@@ -477,11 +488,7 @@
     runner.items = buildRunItems();
     runner.totalMs = runner.items.reduce((a,b)=>a+b.ms,0);
     runner.index = 0;
-    runner.elapsedMs = 0;
-    if (runner.items.length===0) {
-      els.currentLabel.textContent='—'; els.nextLabel.textContent='—'; els.clock.textContent='00:00';
-      els.progressBar.style.width='0%'; return;
-    }
+    if (runner.items.length===0) { updateTimerLabels(null); return; }
     runner.active=true; runner.paused=false;
     startUnit(Date.now(), runner.items[0].ms);
     tick();
@@ -490,7 +497,7 @@
   function startUnit(now, durationMs) {
     runner.unitStart = now;
     runner.unitEnd = now + durationMs;
-    updateTimerUI(); // immediate render
+    updateTimerUI();
     if (runner.timerId) cancelAnimationFrame(runner.timerId);
     const loop = ()=>{
       if (!runner.active || runner.paused) return;
@@ -505,18 +512,15 @@
     const it = runner.items[runner.index];
     if (!it) return stopRunner(true);
     const remain = Math.max(0, runner.unitEnd - now);
-    // UI
     const next = runner.items[runner.index+1];
     els.currentLabel.textContent = it.label;
     els.nextLabel.textContent = next ? next.label : 'Fin';
     els.clock.textContent = fmtClock(remain);
-    const elapsedInUnit = (it.ms - remain);
-    const totalElapsed = runner.items.slice(0, runner.index).reduce((a,b)=>a+b.ms,0) + elapsedInUnit;
+    const totalElapsed = runner.items.slice(0, runner.index).reduce((a,b)=>a+b.ms,0) + (it.ms - remain);
     const pct = runner.totalMs ? Math.min(100, (totalElapsed/runner.totalMs)*100) : 0;
     els.progressBar.style.width = pct.toFixed(2)+'%';
-    // Transition
     if (remain <= 0) {
-      beep(900, 0.12);
+      beep(950, 0.18);
       runner.index += 1;
       if (runner.index >= runner.items.length) return stopRunner(true);
       startUnit(now, runner.items[runner.index].ms);
@@ -538,18 +542,11 @@
     if (runner.timerId) cancelAnimationFrame(runner.timerId);
     releaseWakeLock();
     if (done) {
-      setTimeout(()=>beep(880,0.1), 0);
-      setTimeout(()=>beep(660,0.12), 160);
-      setTimeout(()=>beep(990,0.12), 340);
+      setTimeout(()=>beep(880,0.12), 0);
+      setTimeout(()=>beep(660,0.14), 160);
+      setTimeout(()=>beep(990,0.16), 340);
     }
   }
-
-  function fmtClock(ms) {
-    const s = Math.ceil(ms/1000);
-    const m = Math.floor(s/60); const sec = s%60;
-    return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
-  }
-
   function updateTimerUI() {
     const it = runner.items[runner.index];
     const next = runner.items[runner.index+1];
@@ -558,11 +555,38 @@
     els.clock.textContent = it ? fmtClock(it.ms) : '00:00';
     els.progressBar.style.width = '0%';
   }
+  function updateTimerLabels(it) {
+    els.currentLabel.textContent = it ? it.label : '—';
+    els.nextLabel.textContent = '—';
+    els.clock.textContent = '00:00';
+    els.progressBar.style.width = '0%';
+  }
+
+  function fmtClock(ms) {
+    const s = Math.ceil(ms/1000);
+    const m = Math.floor(s/60); const sec = s%60;
+    return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  }
+
+  // Skip to next big block
+  function skipToNextBlock() {
+    if (!runner.active) return;
+    const cur = runner.items[runner.index];
+    if (!cur) return stopRunner(true);
+    const curBlock = cur.blockId;
+    let j = runner.index + 1;
+    while (j < runner.items.length && runner.items[j].blockId === curBlock) j++;
+    if (j >= runner.items.length) { return stopRunner(true); }
+    runner.index = j;
+    startUnit(Date.now(), runner.items[runner.index].ms);
+    beep(1200, 0.12);
+  }
 
   // Timer controls
   els.startCycle.addEventListener('click', ()=> startRunner());
   els.pauseCycle.addEventListener('click', ()=> runner.paused ? resumeRunner() : pauseRunner());
   els.resetCycle.addEventListener('click', ()=> stopRunner(false));
+  els.skipBlock.addEventListener('click', skipToNextBlock);
 
   // --- Events: tasks
   els.addForm?.addEventListener('submit', (e)=>{

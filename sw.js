@@ -1,5 +1,5 @@
 /* DailyTask Service Worker */
-const CACHE_NAME = 'dailytask-cache-v2';
+const CACHE_NAME = 'dailytask-cache-v3';
 const FILES_TO_CACHE = [
   './',
   './index.html',

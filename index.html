@@ -59,32 +59,14 @@
 
     <!-- Cycles tab -->
     <section class="tab-pane" id="tab-cycles">
-      <section class="card">
-        <div class="row space-between">
-          <div class="row gap">
-            <label for="cycleSelect" class="label">Cycle :</label>
-            <select id="cycleSelect"></select>
-            <button id="addCycle" class="btn secondary">Nouveau cycle</button>
-            <button id="renameCycle" class="btn secondary">Renommer</button>
-            <button id="deleteCycle" class="btn secondary danger">Supprimer</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="row space-between header-line">
-          <h2>Blocs du cycle</h2>
-          <button id="addBlock" class="btn">Ajouter un bloc</button>
-        </div>
-        <ul id="blockList" class="builder-list"></ul>
-      </section>
-
+      <!-- TIMER FIRST -->
       <section class="card">
         <div class="row space-between header-line">
           <h2>Minuteur</h2>
           <div class="row gap">
             <button id="startCycle" class="btn">Démarrer</button>
             <button id="pauseCycle" class="btn secondary">Pause</button>
+            <button id="skipBlock" class="btn secondary">Bloc suivant</button>
             <button id="resetCycle" class="btn secondary">Réinitialiser</button>
           </div>
         </div>
@@ -105,7 +87,29 @@
             <div class="bar" id="progressBar" style="width:0%"></div>
           </div>
         </div>
-        <p class="hint">Le minuteur tente de rester actif. Utilisez <b>Écran noir</b> pour économiser visuellement tout en gardant l'écran allumé (Wake Lock).</p>
+        <p class="hint">Utilisez <b>Écran noir</b> pour un écran éteint simulé tout en gardant le minuteur actif (Wake Lock).</p>
+      </section>
+
+      <!-- Cycle selection -->
+      <section class="card">
+        <div class="row space-between">
+          <div class="row gap">
+            <label for="cycleSelect" class="label">Cycle :</label>
+            <select id="cycleSelect"></select>
+            <button id="addCycle" class="btn secondary">Nouveau cycle</button>
+            <button id="renameCycle" class="btn secondary">Renommer</button>
+            <button id="deleteCycle" class="btn secondary danger">Supprimer</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Blocks builder -->
+      <section class="card">
+        <div class="row space-between header-line">
+          <h2>Blocs du cycle</h2>
+          <button id="addBlock" class="btn">Ajouter un bloc</button>
+        </div>
+        <ul id="blockList" class="builder-list"></ul>
       </section>
     </section>
   </main>
@@ -134,6 +138,7 @@
   <template id="blockItemTemplate">
     <li class="builder-item" draggable="true">
       <button class="drag-handle" aria-label="Déplacer">⋮⋮</button>
+      <button class="collapse-toggle" aria-label="Afficher/masquer les sous-blocs">▾</button>
       <input class="block-title" type="text" placeholder="Nom du bloc" />
       <input class="block-duration" type="text" placeholder="mm:ss" />
       <div class="actions">
