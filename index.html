@@ -15,34 +15,107 @@
       <span class="logo">✔</span>
       <h1>DailyTask</h1>
     </div>
-    <div class="today" id="today"></div>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="tasks">Tâches</button>
+      <button class="tab-btn" data-tab="cycles">Cycles</button>
+    </nav>
+
+    <div class="meta-line">
+      <div class="today" id="today"></div>
+      <div class="controls">
+        <button id="audioEnable" class="btn secondary small">Activer le son</button>
+        <button id="blackoutToggle" class="btn secondary small">Écran noir</button>
+      </div>
+    </div>
   </header>
 
   <main class="container">
-    <section class="add-task-card card">
-      <form id="addForm" autocomplete="off">
-        <input id="taskInput" type="text" placeholder="Ajouter une tâche quotidienne..." aria-label="Nouvelle tâche" required maxlength="200">
-        <button type="submit" class="btn">Ajouter</button>
-      </form>
-      <p class="hint">Astuce : faites glisser les tâches via la poignée ⋮⋮ pour réorganiser. Cochez pour envoyer en bas.</p>
+    <!-- Tasks tab -->
+    <section class="tab-pane show" id="tab-tasks">
+      <section class="add-task-card card">
+        <form id="addForm" autocomplete="off">
+          <input id="taskInput" type="text" placeholder="Ajouter une tâche quotidienne..." aria-label="Nouvelle tâche" required maxlength="200">
+          <button type="submit" class="btn">Ajouter</button>
+        </form>
+        <p class="hint">Astuce : faites glisser les tâches via la poignée ⋮⋮ pour réorganiser. Cochez pour envoyer en bas.</p>
+      </section>
+
+      <section class="list card">
+        <h2>À faire aujourd'hui</h2>
+        <ul id="pendingList" class="task-list" aria-live="polite"></ul>
+      </section>
+
+      <section class="list card">
+        <h2>Terminé aujourd'hui</h2>
+        <ul id="doneList" class="task-list" aria-live="polite"></ul>
+      </section>
+
+      <footer class="app-footer">
+        <button id="resetNow" class="btn secondary">Réinitialiser pour aujourd'hui</button>
+        <span class="small">Les tâches se réinitialisent automatiquement à minuit (heure de l'appareil).</span>
+      </footer>
     </section>
 
-    <section class="list card">
-      <h2>À faire aujourd'hui</h2>
-      <ul id="pendingList" class="task-list" aria-live="polite"></ul>
-    </section>
+    <!-- Cycles tab -->
+    <section class="tab-pane" id="tab-cycles">
+      <section class="card">
+        <div class="row space-between">
+          <div class="row gap">
+            <label for="cycleSelect" class="label">Cycle :</label>
+            <select id="cycleSelect"></select>
+            <button id="addCycle" class="btn secondary">Nouveau cycle</button>
+            <button id="renameCycle" class="btn secondary">Renommer</button>
+            <button id="deleteCycle" class="btn secondary danger">Supprimer</button>
+          </div>
+        </div>
+      </section>
 
-    <section class="list card">
-      <h2>Terminé aujourd'hui</h2>
-      <ul id="doneList" class="task-list" aria-live="polite"></ul>
+      <section class="card">
+        <div class="row space-between header-line">
+          <h2>Blocs du cycle</h2>
+          <button id="addBlock" class="btn">Ajouter un bloc</button>
+        </div>
+        <ul id="blockList" class="builder-list"></ul>
+      </section>
+
+      <section class="card">
+        <div class="row space-between header-line">
+          <h2>Minuteur</h2>
+          <div class="row gap">
+            <button id="startCycle" class="btn">Démarrer</button>
+            <button id="pauseCycle" class="btn secondary">Pause</button>
+            <button id="resetCycle" class="btn secondary">Réinitialiser</button>
+          </div>
+        </div>
+
+        <div id="timerView" class="timer-view">
+          <div class="timer-line">
+            <div class="label">Actuel :</div>
+            <div class="value" id="currentLabel">—</div>
+          </div>
+          <div class="timer-main">
+            <div class="clock" id="clock">00:00</div>
+          </div>
+          <div class="timer-line">
+            <div class="label">Suivant :</div>
+            <div class="value" id="nextLabel">—</div>
+          </div>
+          <div class="timer-progress">
+            <div class="bar" id="progressBar" style="width:0%"></div>
+          </div>
+        </div>
+        <p class="hint">Le minuteur tente de rester actif. Utilisez <b>Écran noir</b> pour économiser visuellement tout en gardant l'écran allumé (Wake Lock).</p>
+      </section>
     </section>
   </main>
 
-  <footer class="app-footer">
-    <button id="resetNow" class="btn secondary">Réinitialiser pour aujourd'hui</button>
-    <span class="small">Les tâches se réinitialisent automatiquement à minuit (heure de l'appareil).</span>
-  </footer>
+  <!-- Blackout overlay (simule écran éteint en gardant l'app active) -->
+  <div id="blackout" class="blackout hidden" tabindex="0" aria-hidden="true">
+    <div class="tip">Touchez pour rallumer</div>
+  </div>
 
+  <!-- Templates -->
   <template id="taskItemTemplate">
     <li class="task" draggable="true">
       <button class="drag-handle" aria-label="Déplacer" title="Glisser pour réordonner">⋮⋮</button>
@@ -54,6 +127,32 @@
       <div class="actions">
         <button class="icon-btn edit" title="Modifier" aria-label="Modifier">✎</button>
         <button class="icon-btn delete" title="Supprimer" aria-label="Supprimer">🗑</button>
+      </div>
+    </li>
+  </template>
+
+  <template id="blockItemTemplate">
+    <li class="builder-item" draggable="true">
+      <button class="drag-handle" aria-label="Déplacer">⋮⋮</button>
+      <input class="block-title" type="text" placeholder="Nom du bloc" />
+      <input class="block-duration" type="text" placeholder="mm:ss" />
+      <div class="actions">
+        <button class="icon-btn add-sub" title="Ajouter sous-bloc">＋</button>
+        <button class="icon-btn duplicate" title="Dupliquer">⎘</button>
+        <button class="icon-btn delete" title="Supprimer">🗑</button>
+      </div>
+      <ul class="sub-list"></ul>
+    </li>
+  </template>
+
+  <template id="subItemTemplate">
+    <li class="builder-sub" draggable="true">
+      <button class="drag-handle" aria-label="Déplacer">⋮</button>
+      <input class="sub-title" type="text" placeholder="Nom" />
+      <input class="sub-duration" type="text" placeholder="mm:ss" />
+      <div class="actions">
+        <button class="icon-btn duplicate" title="Dupliquer">⎘</button>
+        <button class="icon-btn delete" title="Supprimer">🗑</button>
       </div>
     </li>
   </template>

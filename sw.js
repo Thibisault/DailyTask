@@ -1,5 +1,5 @@
 /* DailyTask Service Worker */
-const CACHE_NAME = 'dailytask-cache-v1';
+const CACHE_NAME = 'dailytask-cache-v2';
 const FILES_TO_CACHE = [
   './',
   './index.html',
@@ -29,23 +29,17 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-
-  // App shell and same-origin requests: cache-first with network fallback
   if (new URL(req.url).origin === self.location.origin) {
-    // Ensure navigations work offline
     if (req.mode === 'navigate') {
       event.respondWith(
         caches.match('./index.html').then(cached => cached || fetch(req))
       );
       return;
     }
-
     event.respondWith(
       caches.match(req).then(cached => cached || fetch(req))
     );
     return;
   }
-
-  // For cross-origin (not expected here), just pass through
   event.respondWith(fetch(req));
 });
